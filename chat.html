@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages | GMinsta</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .search-user {
+            padding: 15px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .search-user input {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            color: white;
+        }
+        .user-list-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        .user-list-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .user-list-item img {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="feed.html" class="nav-logo">GMinsta</a>
+        <div class="nav-links">
+            <a href="feed.html"><i class="fa-solid fa-house"></i></a>
+            <a href="chat.html"><i class="fa-solid fa-paper-plane"></i></a>
+            <a href="profile.html"><i class="fa-regular fa-user"></i></a>
+        </div>
+    </nav>
+
+    <main class="chat-wrapper">
+        <div class="chat-list">
+            <div class="search-user">
+                <input type="text" id="userSearch" placeholder="Search users...">
+            </div>
+            <div id="searchResults">
+                <!-- Search results or active chats -->
+            </div>
+            <div id="suggestedUsers" style="padding: 10px;">
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 10px; padding-left: 10px; text-transform: uppercase; letter-spacing: 1px;">Suggested for you</p>
+                <div id="suggestedList"></div>
+            </div>
+        </div>
+        <div class="chat-main" id="chatMain" style="display: none;">
+            <div class="post-header" id="chatHeader" style="border-bottom: 1px solid var(--glass-border);">
+                <!-- Active user info -->
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <!-- Messages will load here -->
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="messageInput" placeholder="Write a message..." style="flex-grow: 1; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 12px; color: white;">
+                <button id="sendMsgBtn" class="btn-primary" style="width: auto; padding: 12px 25px;">Send</button>
+            </div>
+        </div>
+        <div id="noChatSelected" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-secondary);">
+            <i class="fa-regular fa-paper-plane" style="font-size: 3rem; margin-bottom: 15px;"></i>
+            <h3>Your Messages</h3>
+            <p>Send private photos and messages to a friend.</p>
+        </div>
+    </main>
+
+    <script src="js/script.js"></script>
+    <script>
+        let activeReceiverId = null;
+
+        document.getElementById('userSearch').oninput = async (e) => {
+            const query = e.target.value;
+            const suggested = document.getElementById('suggestedUsers');
+            const results = document.getElementById('searchResults');
+            
+            if (query.length < 1) {
+                results.innerHTML = '';
+                suggested.style.display = 'block';
+                return;
+            }
+            
+            suggested.style.display = 'none';
+            const users = await apiRequest(`/users/search/${query}`, 'GET');
+            results.innerHTML = '';
+            users.forEach(u => {
+                const item = `
+                    <div class="user-list-item" onclick="selectChat('${u._id}', '${u.username}', '${u.profilePic}')">
+                        <img src="${u.profilePic}">
+                        <div>
+                            <p class="username">${u.username}</p>
+                            <p style="font-size: 0.8rem; color: var(--text-secondary);">${u.name}</p>
+                        </div>
+                    </div>
+                `;
+                results.innerHTML += item;
+            });
+        };
+
+        async function loadSuggestedUsers() {
+            const users = await apiRequest('/users/suggested', 'GET');
+            const list = document.getElementById('suggestedList');
+            list.innerHTML = '';
+            users.forEach(u => {
+                if (u.username === JSON.parse(localStorage.getItem('user')).username) return;
+                const item = `
+                    <div class="user-list-item" onclick="selectChat('${u._id}', '${u.username}', '${u.profilePic}')">
+                        <img src="${u.profilePic}">
+                        <div>
+                            <p class="username">${u.username}</p>
+                            <p style="font-size: 0.8rem; color: var(--text-secondary);">${u.name}</p>
+                        </div>
+                    </div>
+                `;
+                list.innerHTML += item;
+            });
+        }
+
+        async function selectChat(id, username, pic) {
+            activeReceiverId = id;
+            document.getElementById('noChatSelected').style.display = 'none';
+            document.getElementById('chatMain').style.display = 'flex';
+            document.getElementById('chatHeader').innerHTML = `
+                <img src="${pic}" class="user-avatar">
+                <span class="username">${username}</span>
+            `;
+            loadMessages();
+        }
+
+        async function loadMessages() {
+            if (!activeReceiverId) return;
+            const messages = await apiRequest(`/messages/${activeReceiverId}`, 'GET');
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+            const myUser = JSON.parse(localStorage.getItem('user'));
+            
+            messages.forEach(msg => {
+                const isSent = msg.sender === myUser.id;
+                const time = new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                container.innerHTML += `
+                    <div class="message ${isSent ? 'sent' : 'received'}">
+                        ${msg.text}
+                        <span class="message-time">${time} ${isSent ? '<i class="fa-solid fa-check-double" style="color: #53bdeb;"></i>' : ''}</span>
+                    </div>`;
+            });
+            container.scrollTop = container.scrollHeight;
+        }
+
+        document.getElementById('sendMsgBtn').onclick = async () => {
+            const text = document.getElementById('messageInput').value;
+            if (!text || !activeReceiverId) return;
+            await apiRequest('/messages', 'POST', { receiverId: activeReceiverId, text });
+            document.getElementById('messageInput').value = '';
+            loadMessages();
+        };
+
+        // Poll for new messages every 3 seconds
+        setInterval(loadMessages, 3000);
+        
+        loadSuggestedUsers();
+    </script>
+</body>
+</html>

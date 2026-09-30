@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explore | GMinsta</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .explore-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            margin-top: 20px;
+        }
+        .explore-item {
+            aspect-ratio: 1/1;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+        }
+        .explore-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        .explore-item:hover img {
+            transform: scale(1.05);
+        }
+        .explore-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            color: white;
+            font-weight: 600;
+        }
+        .explore-item:hover .explore-overlay {
+            opacity: 1;
+        }
+        .search-container {
+            margin: 20px 0;
+            position: relative;
+        }
+        .search-container input {
+            width: 100%;
+            padding: 12px 40px;
+            background: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+        }
+        .search-container i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="feed.html" class="nav-logo">GMinsta</a>
+        <div class="nav-links">
+            <a href="feed.html"><i class="fa-solid fa-house"></i></a>
+            <a href="explore.html"><i class="fa-solid fa-magnifying-glass"></i></a>
+            <a href="chat.html"><i class="fa-solid fa-paper-plane"></i></a>
+            <a href="profile.html"><i class="fa-regular fa-user"></i></a>
+        </div>
+    </nav>
+
+    <main class="main-content" style="max-width: 935px;">
+        <div class="search-container">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" placeholder="Search">
+        </div>
+
+        <div class="explore-grid" id="exploreGrid">
+            <!-- Grid items will load here -->
+        </div>
+    </main>
+
+    <script src="js/script.js"></script>
+    <script>
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) window.location.href = 'index.html';
+
+        async function loadExplore() {
+            const posts = await apiRequest('/posts', 'GET');
+            const grid = document.getElementById('exploreGrid');
+            grid.innerHTML = '';
+            
+            posts.forEach(post => {
+                grid.innerHTML += `
+                    <div class="explore-item">
+                        <img src="${post.image}">
+                        <div class="explore-overlay">
+                            <i class="fa-solid fa-heart"></i> ${post.likes.length}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        loadExplore();
+    </script>
+</body>
+</html>

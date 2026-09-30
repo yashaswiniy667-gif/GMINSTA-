@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feed | GMinsta</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="feed.html" class="nav-logo">GMinsta</a>
+        <div class="nav-links">
+            <a href="feed.html"><i class="fa-solid fa-house"></i></a>
+            <a href="chat.html"><i class="fa-solid fa-paper-plane"></i></a>
+            <a href="#" id="openPostModal"><i class="fa-regular fa-square-plus"></i></a>
+            <a href="profile.html"><i class="fa-regular fa-user"></i></a>
+            <a href="#" id="logoutBtn"><i class="fa-solid fa-right-from-bracket"></i></a>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div id="storiesBar" class="stories-container">
+            <!-- Stories will load here -->
+        </div>
+        <div id="feedPosts">
+            <!-- Posts will be loaded here -->
+        </div>
+    </main>
+
+    <!-- Post Creation Modal -->
+    <div id="postModal" class="modal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px;">Create New Post</h2>
+            <form id="createPostForm">
+                <div class="form-group">
+                    <label>Image URL</label>
+                    <input type="text" id="postImageUrl" placeholder="https://picsum.photos/600/600" required>
+                </div>
+                <div class="form-group">
+                    <label>Caption</label>
+                    <input type="text" id="postCaption" placeholder="Write something...">
+                </div>
+                <button type="submit" class="btn-primary">Post</button>
+                <button type="button" id="closeModal" class="btn-primary" style="background: var(--text-secondary); margin-top: 10px;">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+    <script>
+        // Check if logged in
+        if (!localStorage.getItem('token')) window.location.href = 'index.html';
+        const user = JSON.parse(localStorage.getItem('user'));
+
+        async function loadStories() {
+            const stories = await apiRequest('/stories', 'GET');
+            const bar = document.getElementById('storiesBar');
+            bar.innerHTML = `
+                <div class="story-item" onclick="addStory()">
+                    <div class="story-circle" style="background: var(--glass-border);">
+                        <img src="${user.profilePic}">
+                        <div style="position: absolute; bottom: 25px; right: 0; background: var(--accent); border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg-dark);"><i class="fa-solid fa-plus" style="font-size: 0.6rem;"></i></div>
+                    </div>
+                    <span class="story-username">Your Story</span>
+                </div>
+            `;
+            
+            stories.forEach(s => {
+                bar.innerHTML += `
+                    <div class="story-item">
+                        <div class="story-circle">
+                            <img src="${s.user.profilePic}">
+                        </div>
+                        <span class="story-username">${s.user.username}</span>
+                    </div>
+                `;
+            });
+        }
+
+        async function addStory() {
+            const image = prompt('Enter Image URL for your story:');
+            if (image) {
+                await apiRequest('/stories', 'POST', { image });
+                loadStories();
+            }
+        }
+
+        async function loadFeed() {
+            const posts = await apiRequest('/posts', 'GET');
+            const feedContainer = document.getElementById('feedPosts');
+            feedContainer.innerHTML = '';
+            
+            posts.forEach(post => {
+                const isLiked = post.likes.includes(user.id);
+                const card = `
+                    <div class="post-card">
+                        <div class="post-header">
+                            <img src="${post.user.profilePic}" class="user-avatar">
+                            <span class="username">${post.user.username}</span>
+                        </div>
+                        <div class="heart-container" ondblclick="animateHeart('${post._id}')">
+                            <img src="${post.image}" class="post-img" onerror="this.src='https://picsum.photos/600/600'">
+                            <i class="fa-solid fa-heart heart-pop" id="heart-pop-${post._id}"></i>
+                        </div>
+                        <div class="post-actions">
+                            <i class="fa-${isLiked ? 'solid' : 'regular'} fa-heart ${isLiked ? 'active' : ''}" 
+                               id="like-icon-${post._id}" 
+                               onclick="toggleLike('${post._id}')"></i>
+                            <i class="fa-regular fa-comment"></i>
+                        </div>
+                        <div class="post-info">
+                            <span class="likes-count" id="likes-${post._id}">${post.likes.length} likes</span>
+                            <p class="caption"><strong>${post.user.username}</strong> ${post.caption}</p>
+                            
+                            <div class="comments-section" id="comments-${post._id}">
+                                ${post.comments.map(c => `
+                                    <div class="comment-item"><strong>${c.user.username}</strong> ${c.text}</div>
+                                `).join('')}
+                            </div>
+                            
+                            <div class="comment-input-container">
+                                <input type="text" id="comment-input-${post._id}" placeholder="Add a comment...">
+                                <button class="comment-btn" onclick="postComment('${post._id}')">Post</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                feedContainer.innerHTML += card;
+            });
+        }
+
+        async function animateHeart(postId) {
+            const pop = document.getElementById(`heart-pop-${postId}`);
+            pop.classList.add('animate');
+            setTimeout(() => pop.classList.remove('animate'), 600);
+            
+            // Trigger like if not already liked
+            const icon = document.getElementById(`like-icon-${postId}`);
+            if (!icon.classList.contains('active')) {
+                toggleLike(postId);
+            }
+        }
+
+        async function toggleLike(postId) {
+            const res = await apiRequest(`/posts/${postId}/like`, 'POST');
+            const icon = document.getElementById(`like-icon-${postId}`);
+            const count = document.getElementById(`likes-${postId}`);
+            
+            if (res.likes.includes(user.id)) {
+                icon.classList.remove('fa-regular');
+                icon.classList.add('fa-solid', 'active');
+            } else {
+                icon.classList.remove('fa-solid', 'active');
+                icon.classList.add('fa-regular');
+            }
+            count.innerText = `${res.likes.length} likes`;
+        }
+
+        async function postComment(postId) {
+            const input = document.getElementById(`comment-input-${postId}`);
+            const text = input.value;
+            if (!text) return;
+            
+            const res = await apiRequest(`/posts/${postId}/comment`, 'POST', { text });
+            input.value = '';
+            
+            const container = document.getElementById(`comments-${postId}`);
+            container.innerHTML = res.comments.map(c => `
+                <div class="comment-item"><strong>${c.user.username}</strong> ${c.text}</div>
+            `).join('');
+        }
+
+        // Modal logic
+        const modal = document.getElementById('postModal');
+        document.getElementById('openPostModal').onclick = () => modal.style.display = 'flex';
+        document.getElementById('closeModal').onclick = () => modal.style.display = 'none';
+
+        document.getElementById('createPostForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const image = document.getElementById('postImageUrl').value;
+            const caption = document.getElementById('postCaption').value;
+            await apiRequest('/posts', 'POST', { image, caption });
+            modal.style.display = 'none';
+            loadFeed();
+        };
+
+        document.getElementById('logoutBtn').onclick = () => {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        };
+
+        loadStories();
+        loadFeed();
+    </script>
+</body>
+</html>

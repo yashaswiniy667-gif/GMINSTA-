@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile | GMinsta</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            margin-bottom: 50px;
+            padding: 20px;
+        }
+        .profile-pic-large {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 4px solid #bc1888;
+            padding: 4px;
+        }
+        .stats {
+            display: flex;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-weight: 700;
+            display: block;
+        }
+        .post-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        .grid-item {
+            aspect-ratio: 1/1;
+            overflow: hidden;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        .grid-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        .grid-item:hover img {
+            transform: scale(1.05);
+        }
+        .stat-item { cursor: pointer; }
+        .list-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .list-content {
+            background: var(--bg-dark);
+            width: 400px;
+            max-height: 500px;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+        }
+        .list-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .list-body {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .user-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .user-row img {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+        }
+        .user-row .u-info { flex-grow: 1; }
+        .follow-btn-sm {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="feed.html" class="nav-logo">GMinsta</a>
+        <div class="nav-links">
+            <a href="feed.html"><i class="fa-solid fa-house"></i></a>
+            <a href="chat.html"><i class="fa-solid fa-paper-plane"></i></a>
+            <a href="#" id="openPostModal"><i class="fa-regular fa-square-plus"></i></a>
+            <a href="profile.html"><i class="fa-regular fa-user"></i></a>
+        </div>
+    </nav>
+
+    <main class="main-content" style="max-width: 800px;">
+        <div class="profile-header">
+            <img id="profilePic" src="" class="profile-pic-large">
+            <div class="profile-info">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <h2 id="profileUsername" style="font-size: 1.8rem; font-weight: 300;">Username</h2>
+                    <button class="btn-primary" style="width: auto; padding: 6px 16px; background: #334155; font-size: 0.9rem;">Edit Profile</button>
+                    <i class="fa-solid fa-gear" style="font-size: 1.4rem; cursor: pointer;"></i>
+                </div>
+                <div class="stats">
+                    <div class="stat-item"><span class="stat-value" id="postsCount">0</span> posts</div>
+                    <div class="stat-item"><span class="stat-value" id="followersCount">0</span> followers</div>
+                    <div class="stat-item"><span class="stat-value" id="followingCount">0</span> following</div>
+                </div>
+                <p id="profileName" style="font-weight: 600;">Full Name</p>
+                <p id="profileBio">Bio goes here...</p>
+            </div>
+        </div>
+
+        <div class="post-grid" id="profileGrid">
+            <!-- User posts will load here -->
+        </div>
+    </main>
+
+    <!-- Post Creation Modal -->
+    <div id="postModal" class="modal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px;">Create New Post</h2>
+            <form id="createPostForm">
+                <div class="form-group">
+                    <label>Image URL</label>
+                    <input type="text" id="postImageUrl" placeholder="https://picsum.photos/600/600" required>
+                </div>
+                <div class="form-group">
+                    <label>Caption</label>
+                    <input type="text" id="postCaption" placeholder="Write something...">
+                </div>
+                <button type="submit" class="btn-primary">Post</button>
+                <button type="button" id="closeModal" class="btn-primary" style="background: var(--text-secondary); margin-top: 10px;">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+    <script>
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) window.location.href = 'index.html';
+
+        async function loadProfile() {
+            const profileData = await apiRequest(`/users/${user.username}`, 'GET');
+            const posts = await apiRequest(`/posts/user/${user.username}`, 'GET');
+
+            document.getElementById('profilePic').src = profileData.profilePic;
+            document.getElementById('profileUsername').innerText = profileData.username;
+            document.getElementById('profileName').innerText = profileData.name;
+            document.getElementById('profileBio').innerText = profileData.bio || 'No bio yet';
+            document.getElementById('postsCount').innerText = posts.length;
+            document.getElementById('followersCount').innerText = profileData.followers;
+            document.getElementById('followingCount').innerText = profileData.following;
+
+            const grid = document.getElementById('profileGrid');
+            grid.innerHTML = '';
+            posts.forEach(post => {
+                grid.innerHTML += `
+                    <div class="grid-item">
+                        <img src="${post.image}" onerror="this.src='https://picsum.photos/600/600'">
+                    </div>`;
+            });
+        }
+
+        async function openList(type) {
+            const modal = document.getElementById('listModal');
+            const title = document.getElementById('listTitle');
+            const body = document.getElementById('listBody');
+            
+            title.innerText = type === 'followers' ? 'Followers' : 'Following';
+            modal.style.display = 'flex';
+            
+            // For now, we show all users as a sample list
+            const users = await apiRequest('/users/suggested', 'GET');
+            body.innerHTML = '';
+            users.forEach(u => {
+                body.innerHTML += `
+                    <div class="user-row">
+                        <img src="${u.profilePic}">
+                        <div class="u-info">
+                            <p style="font-weight: 600; font-size: 0.9rem;">${u.username}</p>
+                            <p style="color: var(--text-secondary); font-size: 0.8rem;">${u.name}</p>
+                        </div>
+                        <button class="follow-btn-sm">Follow</button>
+                    </div>
+                `;
+            });
+        }
+
+        function closeList() {
+            document.getElementById('listModal').style.display = 'none';
+        }
+
+        // Modal logic
+        const modal = document.getElementById('postModal');
+        document.getElementById('openPostModal').onclick = () => modal.style.display = 'flex';
+        document.getElementById('closeModal').onclick = () => modal.style.display = 'none';
+
+        document.getElementById('createPostForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const image = document.getElementById('postImageUrl').value;
+            const caption = document.getElementById('postCaption').value;
+            await apiRequest('/posts', 'POST', { image, caption });
+            modal.style.display = 'none';
+            loadProfile(); // Refresh profile after posting
+        };
+
+        // Click listeners for stats
+        document.getElementById('followersCount').parentElement.onclick = () => openList('followers');
+        document.getElementById('followingCount').parentElement.onclick = () => openList('following');
+
+        loadProfile();
+    </script>
+    
+    <!-- List Modal -->
+    <div id="listModal" class="list-modal">
+        <div class="list-content">
+            <div class="list-header">
+                <h3 id="listTitle">Users</h3>
+                <i class="fa-solid fa-times" style="cursor: pointer;" onclick="closeList()"></i>
+            </div>
+            <div class="list-body" id="listBody">
+                <!-- User list will load here -->
+            </div>
+        </div>
+    </div>
+</body>
+</html>
